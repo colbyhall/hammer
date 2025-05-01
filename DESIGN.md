@@ -4,8 +4,13 @@ The purpose of this document is to flesh out the general structure of the engine
 ## Table of Contents
 - [Introduction](#introduction)
 - [Philosophy](#philosophy)
+    - [Pillars](#pillars)
+        - [Code Pillars](#code-pillars)
+        - [Tool Pillars](#tool-pillars)
     - [Foot Guns](#foot-guns)
         - [Globals](#globals)
+- [Structure](#structure)
+- [Core](#core)
 
 ## Content
 
@@ -16,6 +21,23 @@ Hammer is a personal project with no sense of scope or timeline therefore the go
 
 ### Philosophy 
 This section is to discuss general patterns and foot guns to look out for. Nothing discussed in this section is absolute. There are always exceptions.
+
+#### Pillars
+Pillars in this context are goals that everything created must meet.
+
+##### Code Pillars
+- Readable
+- Refactorable
+- Simple
+- Performance Oriented
+
+##### Tool Pillars
+Tools are essential when it comes to game development. The higher quality your tools are the more efficient your development processes can be.
+
+The pillars are as follows:
+- Fast Iteration Times
+- Easy to implement
+- Easy to understand
 
 #### Foot Guns 
 A foot gun is something that can make it easy to solve problem but typically causes problems later.
@@ -32,3 +54,5 @@ OpenGL relies on opaque thread local global state that is initialized through a 
 
 ---
 
+### Core
+Core is the standard library of all engine code. It is expected every library or application will depend on it and it is included by default when all new modules are created.
