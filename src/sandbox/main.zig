@@ -1,8 +1,28 @@
 const core = @import("core");
+const mem = core.mem;
 const math = core.math;
 const Vector2 = core.math.Vector2;
 
-pub fn main() void {
-    const foo = Vector2(i32){ .x = 120, .y = 123 };
-    core.debug.print("Hello World {}\n", .{foo});
+const Scheduler = core.Scheduler;
+const Counter = Scheduler.Counter;
+
+pub fn main() !void {
+    var gpa = core.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    var scheduler: Scheduler = undefined;
+    try scheduler.init(.{ .allocator = allocator });
+
+    const count = 32;
+    var counter = Counter.init(count, 0);
+    for (0..count) |_| {
+        try scheduler.enqueue(.low, doThing, .{&counter});
+    }
+
+    scheduler.waitFor(counter.work());
+}
+
+fn doThing(counter: *Counter) void {
+    _ = counter.increment();
+    core.debug.print("Hello World\n", .{});
 }
