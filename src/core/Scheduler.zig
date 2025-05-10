@@ -20,6 +20,7 @@ fibers: []Fiber,
 free_fibers: MPMC(u32),
 waiting_work: []WaitingWork,
 
+// This value is cached so yielding threads know what scheduler relative fiber they're running
 threadlocal var fiber_index: ?u32 = 0;
 
 const Task = struct {
@@ -138,35 +139,52 @@ fn doWork(scheduler: *Scheduler, original_fiber_index: u32) void {
             else => {},
         }
 
-        // Execute the jobs of highest priority first and if one is executed rerun the
-        // work loop.
+        // Execute the jobs from highest to lowest priority and if one is executed rerun the
+        // outer loop.
         var job = scheduler.queues[@intFromEnum(Priority.high)].pop();
         if (job != null) {
             job.?.execute(job.?.ptr);
             continue;
         }
 
+        // Look for work to that is complete so that we can resume the yielded fiber
         for (scheduler.waiting_work) |*w| {
+            // For now just skip alread locked work because outer will always loop back around. This may introduce latency
+            // between work completion and resuming the fiber that is yielded waiting on it.
             if (!w.mutex.tryLock()) continue;
 
+            // Skip if no work is listed
             if (w.inner == null) {
                 w.mutex.unlock();
                 continue;
             }
 
+            // Skip if the work isn't completed
             const inner = &w.inner.?;
             if (!inner.work.isComplete()) {
                 w.mutex.unlock();
                 continue;
             }
 
+            // We can only switch to a fiber if...
+            // A. The work required that the it resumes back on the thread that yielded to it and this is that thread
+            // or
+            // B. No thread requirement was added
             const switch_to_fiber = (inner.thread != null and inner.thread.? == Thread.getCurrentId()) or inner.thread == null;
             if (switch_to_fiber) {
+                assert(original_fiber_index == fiber_index.?);
+
+                // Update the current fiber index to the fiber we're resuming work on
+                fiber_index = inner.fiber;
+
+                // Reset the waiting work slot and unlock the mutex
                 w.inner = null;
                 w.mutex.unlock();
 
+                // Add this fiber back to the free list so it can be used by threads waiting for their work to be complete
+                // TODO: This is possibly a race condition because the active fiber could be
+                // popped from free fibers before active fiber has switched.
                 _ = scheduler.free_fibers.push(original_fiber_index);
-                fiber_index = inner.fiber;
                 scheduler.fibers[inner.fiber].switchTo();
 
                 continue :outer;
@@ -204,6 +222,7 @@ pub fn enqueue(self: *Scheduler, priority: Priority, comptime func: anytype, arg
     };
 
     // Allocate the closure and fill it out
+    // TODO: Use an atomic ring allocator for closures so they are cheap and never have to be freed
     const closure = try self.allocator.create(Closure);
     closure.* = .{
         .args = args,
@@ -217,8 +236,11 @@ pub fn enqueue(self: *Scheduler, priority: Priority, comptime func: anytype, arg
     });
 }
 
+/// Interface for anything that can be considered complete.
 pub const Work = struct {
     ptr: *anyopaque,
+
+    /// Returns true if the underlying state is complete. Must be thread safe.
     is_complete: *const fn (ptr: *anyopaque) bool,
 
     pub fn isComplete(self: @This()) bool {
@@ -236,6 +258,8 @@ const WaitingWork = struct {
     inner: ?Inner,
 };
 
+/// Yields this fibers execution and switches to an available worker so task can be completed
+/// while the original fiber waits.
 pub fn yieldUntilComplete(self: *Scheduler, work: Work) void {
     if (work.isComplete()) return;
 
