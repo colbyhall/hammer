@@ -4,6 +4,7 @@ const math = core.math;
 const Vector2 = core.math.Vector2;
 
 const Scheduler = core.Scheduler;
+const Fiber = Scheduler.Fiber;
 const Counter = Scheduler.Counter;
 
 pub fn main() !void {
@@ -19,10 +20,10 @@ pub fn main() !void {
         try scheduler.enqueue(.low, doThing, .{&counter});
     }
 
-    scheduler.waitFor(counter.work());
+    scheduler.yieldUntilComplete(counter.work());
 }
 
 fn doThing(counter: *Counter) void {
-    _ = counter.increment();
-    core.debug.print("Hello World\n", .{});
+    defer _ = counter.increment();
+    core.debug.print("Hello World {}\n", .{core.Thread.getCurrentId()});
 }
