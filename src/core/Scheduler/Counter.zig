@@ -18,7 +18,7 @@ pub fn increment(self: *Counter) bool {
     return self.value.fetchAdd(1, .acq_rel) + 1 == self.target;
 }
 
-pub fn work(self: *Counter) Work {
+pub fn asWork(self: *Counter) Work {
     return .{
         .ptr = self,
         .is_complete = &isComplete,

@@ -14,13 +14,13 @@ pub fn main() !void {
     var scheduler: Scheduler = undefined;
     try scheduler.init(.{ .allocator = allocator });
 
-    const count = 32;
+    const count = 1024 * 1024;
     var counter = Counter.init(count, 0);
     for (0..count) |_| {
         try scheduler.enqueue(.low, doThing, .{&counter});
     }
 
-    scheduler.yieldUntilComplete(counter.work());
+    scheduler.yieldUntilComplete(counter.asWork());
 }
 
 fn doThing(counter: *Counter) void {
