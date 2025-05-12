@@ -10,16 +10,33 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const sandbox_module = b.createModule(.{
+    const gpu_mod = b.createModule(.{
+        .root_source_file = b.path("src/gpu/gpu.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    gpu_mod.addImport("core", core_mod);
+
+    gpu_mod.addCSourceFile(.{
+        .file = b.path("src/gpu/drivers/metal/metal.m"),
+        .language = .objective_c,
+    });
+    gpu_mod.addIncludePath(b.path("src/gpu/drivers/metal/"));
+    gpu_mod.linkSystemLibrary("objc", .{});
+    gpu_mod.linkFramework("appkit", .{});
+    gpu_mod.linkFramework("metal", .{});
+
+    const sandbox_mod = b.createModule(.{
         .root_source_file = b.path("src/sandbox/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    sandbox_module.addImport("core", core_mod);
+    sandbox_mod.addImport("core", core_mod);
+    sandbox_mod.addImport("gpu", gpu_mod);
 
     const sandbox = b.addExecutable(.{
         .name = "sandbox",
-        .root_module = sandbox_module,
+        .root_module = sandbox_mod,
     });
 
     b.installArtifact(sandbox);
@@ -40,7 +57,7 @@ pub fn build(b: *std.Build) void {
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     const exe_unit_tests = b.addTest(.{
-        .root_module = sandbox_module,
+        .root_module = sandbox_mod,
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
